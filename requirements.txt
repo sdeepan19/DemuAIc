@@ -1,0 +1,17 @@
+pywebview
+
+spotipy
+
+transformers
+
+torch
+
+flask
+
+langdetect
+
+pythonnet
+
+opencv-python
+
+pillow
