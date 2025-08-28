@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
@@ -110,6 +110,149 @@
     document.getElementById("voice-btn").onclick = async () => {
       const result = await window.pywebview.api.analyze_voice();
       updateMoodDisplay(result);
+    };
+  </script>
+</body>
+</html>
+
+ -->
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DemuAic - AI Mood Music</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@700&display=swap" rel="stylesheet"/>
+  <style>
+    .mood-icon { width: 64px; height: 64px; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.3);} 100% {transform: scale(1);} }
+    #overlay { position:absolute; top:0; left:0; pointer-events:none; }
+  </style>
+</head>
+<body class="bg-gradient-to-b from-green-200 to-green-50 font-sans p-4">
+  <header class="text-center mb-6">
+    <h1 class="text-4xl font-bold text-green-800">DemuAic</h1>
+    <p class="text-lg text-green-700">Feel the Music of Your Mood</p>
+  </header>
+
+  <section class="mb-6">
+    <h2 class="text-2xl font-semibold text-green-800">Manual Mood Entry</h2>
+    <input type="text" id="mood-input" placeholder="Happy, Sad, Energetic..." class="border p-2 rounded w-full mt-2"/>
+    <button id="text-btn" class="mt-2 bg-green-600 text-white px-4 py-2 rounded">Detect Mood & Play Song</button>
+  </section>
+
+  <section class="mb-6 relative">
+    <h2 class="text-2xl font-semibold text-green-800">Face Recognition</h2>
+    <button id="face-btn" class="mt-2 bg-green-600 text-white px-4 py-2 rounded">Activate Face Mood Detection</button>
+    <video id="video-feed" autoplay playsinline class="rounded shadow mt-2 hidden"></video>
+    <canvas id="overlay" class="hidden"></canvas>
+  </section>
+
+  <section class="mb-6">
+    <h2 class="text-2xl font-semibold text-green-800">Voice Recognition</h2>
+    <button id="voice-btn" class="mt-2 bg-green-600 text-white px-4 py-2 rounded">Speak Your Mood</button>
+  </section>
+
+  <section class="mb-6">
+    <h2 class="text-2xl font-semibold text-green-800">Detected Mood</h2>
+    <div class="p-4 bg-white rounded shadow">
+      <img id="mood-icon" src="https://api.iconify.design/mdi:emoticon-outline.svg?color=%234ade80&width=64&height=64" class="mood-icon"/>
+      <p id="result-text" class="mt-2 text-green-700">No mood detected yet</p>
+      <p id="result-song" class="mt-1 text-green-600"></p>
+      <a id="result-url" href="#" target="_blank" class="text-green-800 font-semibold mt-2 block"></a>
+    </div>
+  </section>
+
+  <script>
+    const resultText = document.getElementById("result-text");
+    const resultSong = document.getElementById("result-song");
+    const resultUrl = document.getElementById("result-url");
+    const moodIcon = document.getElementById("mood-icon");
+    const videoFeed = document.getElementById("video-feed");
+    const overlay = document.getElementById("overlay");
+    
+    const moodIcons = {
+      joy: "https://api.iconify.design/mdi:emoticon-happy-outline.svg?color=%23FFD700",
+      sadness: "https://api.iconify.design/mdi:emoticon-sad-outline.svg?color=%23007BFF",
+      anger: "https://api.iconify.design/mdi:emoticon-angry-outline.svg?color=%23FF0000",
+      fear: "https://api.iconify.design/mdi:emoticon-confused-outline.svg?color=%23008080",
+      neutral: "https://api.iconify.design/mdi:emoticon-neutral-outline.svg?color=%23AAAAAA",
+      surprise: "https://api.iconify.design/mdi:emoticon-surprised-outline.svg?color=%23FF69B4",
+      disgust: "https://api.iconify.design/mdi:emoticon-devil-outline.svg?color=%2300FF00",
+    };
+
+    async function updateMoodDisplay(result){
+      if(result.error){
+        resultText.textContent = "⚠️ " + result.error;
+        resultSong.textContent = "";
+        resultUrl.href = "#";
+        moodIcon.src = "https://api.iconify.design/mdi:emoticon-outline.svg?color=%234ade80";
+      } else {
+        resultText.textContent = `Mood: ${result.mood} (${result.confidence || ""})`;
+        resultSong.textContent = result.song;
+        resultUrl.href = result.url;
+        resultUrl.textContent = "🎵 Play on Spotify";
+        moodIcon.src = moodIcons[result.mood] || moodIcons["neutral"];
+      }
+    }
+
+    // Text Mood
+    document.getElementById("text-btn").onclick = async () => {
+      const text = document.getElementById("mood-input").value;
+      const result = await window.pywebview.api.analyze_text(text);
+      updateMoodDisplay(result);
+    };
+
+    // Voice Mood
+    document.getElementById("voice-btn").onclick = async () => {
+      const result = await window.pywebview.api.analyze_voice();
+      updateMoodDisplay(result);
+    };
+
+    // Face Mood with live rectangle
+    document.getElementById("face-btn").onclick = async () => {
+      try{
+        const stream = await navigator.mediaDevices.getUserMedia({video:true});
+        videoFeed.srcObject = stream;
+        videoFeed.classList.remove("hidden");
+        overlay.classList.remove("hidden");
+        overlay.width = videoFeed.videoWidth;
+        overlay.height = videoFeed.videoHeight;
+
+        videoFeed.onloadedmetadata = async () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = videoFeed.videoWidth;
+          canvas.height = videoFeed.videoHeight;
+          canvas.getContext("2d").drawImage(videoFeed, 0, 0);
+          const imageData = canvas.toDataURL("image/jpeg");
+
+          // Send to backend (Python) for face + mood detection
+          const result = await window.pywebview.api.analyze_face(imageData);
+
+          if(result.error){
+            alert(result.error);
+          } else {
+            // Draw rectangle around face
+            const ctx = overlay.getContext("2d");
+            ctx.clearRect(0,0,overlay.width,overlay.height);
+            ctx.strokeStyle="red";
+            ctx.lineWidth=3;
+            ctx.strokeRect(result.face_x, result.face_y, result.face_w, result.face_h);
+
+            updateMoodDisplay(result);
+          }
+
+          setTimeout(()=>{
+            stream.getTracks().forEach(track=>track.stop());
+            videoFeed.classList.add("hidden");
+            overlay.classList.add("hidden");
+          },1500);
+        };
+
+      } catch(e){
+        alert("Camera access denied or unavailable.");
+      }
     };
   </script>
 </body>
