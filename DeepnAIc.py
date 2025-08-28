@@ -129,7 +129,7 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
     redirect_uri="http://127.0.0.1:8888/callback",
     scope="user-read-playback-state,user-modify-playback-state,"
           "user-read-currently-playing,user-library-read,user-top-read,playlist-read-private",
-    cache_path=".spotifycache"  # ✅ prevents repeated login prompts
+    cache_path=".spotifycache"
 ))
 
 # NLP & Face Pipelines
@@ -162,23 +162,20 @@ class DemuAicAPI:
         return self.get_track_for_mood(mood, confidence=result["score"])
 
     def analyze_face(self, image_data):
-        """Detect face in base64 image and classify emotion."""
+        """Detect face and return mood + Spotify track."""
         try:
-            # Decode base64 image
             img_bytes = base64.b64decode(image_data.split(",")[1])
             np_arr = np.frombuffer(img_bytes, np.uint8)
             frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
             if frame is None:
                 return {"error": "Could not decode image"}
 
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             faces = face_cascade.detectMultiScale(gray, 1.1, 3, minSize=(60, 60))
-
             if len(faces) == 0:
                 return {"error": "No face detected"}
 
-            (x, y, w, h) = faces[0]  # first detected face
+            (x, y, w, h) = faces[0]
             face = frame[y:y+h, x:x+w]
             face_rgb = cv2.cvtColor(face, cv2.COLOR_BGR2RGB)
             face_pil = Image.fromarray(face_rgb)
@@ -187,7 +184,17 @@ class DemuAicAPI:
             mood = preds[0]["label"].lower()
             confidence = preds[0]["score"]
 
-            return self.get_track_for_mood(mood, confidence=confidence)
+            track_info = self.get_track_for_mood(mood)
+            return {
+                "mood": mood,
+                "confidence": round(confidence,2),
+                "song": track_info["song"],
+                "url": track_info["url"],
+                "face_x": x,
+                "face_y": y,
+                "face_w": w,
+                "face_h": h
+            }
 
         except Exception as e:
             return {"error": f"Face analysis failed: {str(e)}"}
@@ -213,19 +220,17 @@ class DemuAicAPI:
         artist = chosen["artists"][0]["name"]
         url = chosen["external_urls"]["spotify"]
 
-        # Try to play on Spotify Premium; otherwise, open in browser
         try:
             devices = sp.devices()
             if devices["devices"]:
                 device_id = devices["devices"][0]["id"]
                 sp.start_playback(device_id=device_id, uris=[chosen["uri"]])
         except spotipy.exceptions.SpotifyException:
-            # If playback fails (e.g., Free account), open in web browser
             webbrowser.open(url)
 
         return {
             "mood": mood,
-            "confidence": round(confidence, 2) if confidence else None,
+            "confidence": round(confidence,2) if confidence else None,
             "song": f"{song_name} - {artist}",
             "url": url
         }
@@ -234,4 +239,5 @@ if __name__ == "__main__":
     api = DemuAicAPI()
     window = webview.create_window("DemuAic - AI Mood Music", "home.html", js_api=api)
     webview.start(debug=True)
+
 
