@@ -243,6 +243,21 @@
 
     # client_id="8016d9d06cde4ed8a397f52d3c41dd99",
     # client_secret="9aa2f8b033104ec0b4092a685a6714b0",
+# Project: MusAIc – Feel the Music of Your Mood
+# Author: Samarth Ryan Edward, Ishaan Verma
+# Description:
+#     This project integrates:
+#       - Spotify Web API (Spotipy)
+#       - Hugging Face Transformers (for text & image-based emotion detection)
+#       - PyWebView (desktop frontend window for HTML UI)
+#       - OpenCV (face detection)
+#
+#     The application detects a user's mood (via text input or facial recognition),
+#     then generates a dynamic music query to play personalized Spotify tracks.
+#
+# Dependencies:
+#     pip install pywebview spotipy transformers torch opencv-python pillow
+
 import webview
 import random
 import webbrowser
